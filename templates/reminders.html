@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Medication Reminders</h1>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Create from Confirmed Fact</h5>
+            </div>
+            <div class="card-body" id="confirmed-facts">
+                <div class="text-center text-muted py-4">Loading...</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Active Reminders</h5>
+            </div>
+            <div class="card-body" id="active-reminders">
+                <div class="text-center text-muted py-4">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">All Reminders</h5>
+    </div>
+    <div class="card-body" id="all-reminders">
+        <div class="text-center text-muted py-4">Loading...</div>
+    </div>
+</div>
+
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Preview Reminder</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="previewBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmReminderBtn">Confirm & Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const token = localStorage.getItem('access_token');
+    if (!token) window.location.href = '/login';
+    
+    let currentPreview = null;
+    
+    async function fetchAPI(endpoint, options = {}) {
+        const response = await fetch(endpoint, {
+            ...options,
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                ...(options.headers || {})
+            }
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({detail: 'Request failed'}));
+            throw new Error(err.detail || 'Request failed');
+        }
+        return response.json();
+    }
+    
+    async function loadReminders() {
+        try {
+            const [facts, active, all] = await Promise.all([
+                fetchAPI('/api/documents/patient/' + getUserId() + '/facts?status=patient_confirmed'),
+                fetchAPI('/api/reminders?status=active'),
+                fetchAPI('/api/reminders')
+            ]);
+            renderConfirmedFacts(facts);
+            renderReminders('active-reminders', active, true);
+            renderReminders('all-reminders', all, false);
+        } catch (err) {
+            console.error(err);
+        }
+    }
+    
+    function getUserId() {
+        return JSON.parse(atob(token.split('.')[1])).sub;
+    }
+    
+    function renderConfirmedFacts(facts) {
+        const container = document.getElementById('confirmed-facts');
+        const medFacts = facts.filter(f => ['medication', 'medication_dose', 'instruction'].includes(f.fact_type));
+        if (medFacts.length === 0) {
+            container.innerHTML = '<p class="text-muted">No confirmed medication facts. Review facts in Documents first.</p>';
+            return;
+        }
+        container.innerHTML = medFacts.map(fact => `
+            <div class="card fact-card confirmed mb-2">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${fact.extracted_value}</strong>
+                            <br><small class="text-muted">Page ${fact.page_number} • ${fact.fact_type}</small>
+                        </div>
+                        <button class="btn btn-sm btn-primary" onclick="previewReminder(${fact.id})">
+                            <i class="bi bi-plus-circle"></i> Create Reminder
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    async function previewReminder(factId) {
+        try {
+            const preview = await fetchAPI(`/api/reminders/preview/${factId}`);
+            currentPreview = preview;
+            renderPreview(preview);
+            new bootstrap.Modal(document.getElementById('previewModal')).show();
+        } catch (err) {
+            alert('Failed to preview: ' + err.message);
+        }
+    }
+    
+    function renderPreview(preview) {
+        const container = document.getElementById('previewBody');
+        container.innerHTML = `
+            <div class="mb-3">
+                <label class="form-label">Medication Name</label>
+                <input type="text" class="form-control" id="preview-med-name" value="${preview.medication_name}" required>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Dose</label>
+                    <input type="text" class="form-control" id="preview-dose" value="${preview.dose || ''}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Route</label>
+                    <input type="text" class="form-control" id="preview-route" value="${preview.route || ''}">
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Frequency</label>
+                    <input type="text" class="form-control" id="preview-frequency" value="${preview.frequency || ''}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Times (comma separated)</label>
+                    <input type="text" class="form-control" id="preview-times" value="${(preview.times || []).join(', ')}" placeholder="08:00, 20:00">
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="preview-start" value="${preview.start_date ? preview.start_date.split('T')[0] : ''}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="preview-end" value="${preview.end_date ? preview.end_date.split('T')[0] : ''}">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Timezone</label>
+                <input type="text" class="form-control" id="preview-timezone" value="${preview.timezone || 'UTC'}">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Notes</label>
+                <textarea class="form-control" id="preview-notes" rows="2"></textarea>
+            </div>
+            <div class="alert alert-info">
+                <strong>Source:</strong> ${preview.source_text || 'From confirmed fact'}
+            </div>
+        `;
+    }
+    
+    document.getElementById('confirmReminderBtn').addEventListener('click', async () => {
+        if (!currentPreview) return;
+        
+        const reminder = {
+            medication_name: document.getElementById('preview-med-name').value,
+            dose: document.getElementById('preview-dose').value || null,
+            route: document.getElementById('preview-route').value || null,
+            frequency: document.getElementById('preview-frequency').value || null,
+            times: document.getElementById('preview-times').value.split(',').map(t => t.trim()).filter(t => t),
+            start_date: document.getElementById('preview-start').value || null,
+            end_date: document.getElementById('preview-end').value || null,
+            timezone: document.getElementById('preview-timezone').value || 'UTC',
+            notes: document.getElementById('preview-notes').value || null,
+            fact_id: currentPreview.fact_id,
+        };
+        
+        try {
+            await fetchAPI('/api/reminders/confirm', {
+                method: 'POST',
+                body: JSON.stringify({reminder, confirmed: true})
+            });
+            bootstrap.Modal.getInstance(document.getElementById('previewModal')).hide();
+            loadReminders();
+        } catch (err) {
+            alert('Failed to create reminder: ' + err.message);
+        }
+    });
+    
+    function renderReminders(containerId, reminders, activeOnly) {
+        const container = document.getElementById(containerId);
+        const filtered = activeOnly ? reminders.filter(r => r.status === 'active') : reminders;
+        if (filtered.length === 0) {
+            container.innerHTML = '<p class="text-muted text-center py-3">No reminders found.</p>';
+            return;
+        }
+        container.innerHTML = filtered.map(r => `
+            <div class="card mb-2">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${r.medication_name}</strong>
+                            ${r.dose ? `<span class="badge bg-secondary ms-2">${r.dose}</span>` : ''}
+                            ${r.frequency ? `<span class="badge bg-info ms-2">${r.frequency}</span>` : ''}
+                            <br><small class="text-muted">Status: ${r.status} • ${r.times?.join(', ') || 'No specific times'}</small>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            ${r.status === 'active' ? `
+                                <button class="btn btn-outline-warning" onclick="changeStatus(${r.id}, 'paused')">Pause</button>
+                                <button class="btn btn-outline-danger" onclick="changeStatus(${r.id}, 'cancelled')">Cancel</button>
+                            ` : r.status === 'paused' ? `
+                                <button class="btn btn-outline-success" onclick="changeStatus(${r.id}, 'active')">Resume</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    async function changeStatus(reminderId, status) {
+        try {
+            await fetchAPI(`/api/reminders/${reminderId}/status`, {
+                method: 'PATCH',
+                body: JSON.stringify(status)
+            });
+            loadReminders();
+        } catch (err) {
+            alert('Failed to update: ' + err.message);
+        }
+    }
+    
+    loadReminders();
+</script>
+{% endblock %}

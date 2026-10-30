@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Medical Timeline</h1>
+</div>
+
+<div class="card">
+    <div class="card-body" id="timeline">
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2">Loading timeline...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const token = localStorage.getItem('access_token');
+    if (!token) window.location.href = '/login';
+    
+    async function fetchAPI(endpoint) {
+        const response = await fetch(endpoint, {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        if (!response.ok) throw new Error('Failed to fetch');
+        return response.json();
+    }
+    
+    function getUserId() {
+        return JSON.parse(atob(token.split('.')[1])).sub;
+    }
+    
+    async function loadTimeline() {
+        try {
+            const events = await fetchAPI('/api/timeline/patient/' + getUserId());
+            renderTimeline(events);
+        } catch (err) {
+            document.getElementById('timeline').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+        }
+    }
+    
+    function renderTimeline(events) {
+        const container = document.getElementById('timeline');
+        if (events.length === 0) {
+            container.innerHTML = '<div class="text-center py-5 text-muted">No timeline events yet. Upload a document to get started.</div>';
+            return;
+        }
+        
+        container.innerHTML = `
+            <div class="timeline">
+                ${events.map(event => `
+                    <div class="timeline-item d-flex mb-4 pb-4 border-end" style="border-left: 3px solid #2563eb; padding-left: 1.5rem; position: relative;">
+                        <div style="position: absolute; left: -0.65rem; top: 0.25rem; width: 1rem; height: 1rem; border-radius: 50%; background: #2563eb; border: 3px solid white;"></div>
+                        <div class="text-muted me-3" style="min-width: 160px; white-space: nowrap;">
+                            ${new Date(event.event_date).toLocaleString()}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h6 class="mb-1">${event.title}</h6>
+                                <span class="badge bg-secondary">${event.event_type}</span>
+                            </div>
+                            ${event.description ? `<p class="mb-1 text-muted">${event.description}</p>` : ''}
+                            ${event.metadata ? `<small class="text-muted">${JSON.stringify(event.metadata)}</small>` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+    
+    loadTimeline();
+</script>
+{% endblock %}

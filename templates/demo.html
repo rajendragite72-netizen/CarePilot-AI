@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="bi bi-robot"></i> CarePilot AI Demo Walkthrough</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h5>Quick Start</h5>
+                    <ol>
+                        <li>Click "Seed Demo Accounts" to create synthetic test accounts</li>
+                        <li>Login as <strong>patient@carepilot.demo</strong> / <strong>patient123</strong></li>
+                        <li>Upload a prescription PDF in the Documents section</li>
+                        <li>Review extracted medical facts</li>
+                        <li>Confirm facts to enable reminder creation</li>
+                        <li>Create medication reminders in the Reminders section</li>
+                        <li>Chat with the AI assistant about your records</li>
+                    </ol>
+                </div>
+                
+                <h5>Demo Features</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6><i class="bi bi-upload"></i> Document Upload</h6>
+                                <p class="mb-0 small">Upload PDF prescriptions. Text is extracted with page references.</p>
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6><i class="bi bi-eye"></i> Fact Review</h6>
+                                <p class="mb-0 small">Review extracted medications, doses, frequencies. Mark as confirmed or uncertain.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6><i class="bi bi-bell"></i> Reminder Creation</h6>
+                                <p class="mb-0 small">Create reminders from confirmed facts. Explicit confirmation required.</p>
+                            </div>
+                        </div>
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6><i class="bi bi-chat"></i> AI Assistant</h6>
+                                <p class="mb-0 small">Ask questions. Answers grounded only in your confirmed records.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h5>Access Control Demo</h5>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <i class="bi bi-person text-success fs-1"></i>
+                                <h6 class="mt-2">Patient</h6>
+                                <small class="text-muted">Full access to own records</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <i class="bi bi-person-badge text-primary fs-1"></i>
+                                <h6 class="mt-2">Doctor</h6>
+                                <small class="text-muted">Access via patient grant only</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <i class="bi bi-person-lines-fill text-secondary fs-1"></i>
+                                <h6 class="mt-2">Staff</h6>
+                                <small class="text-muted">Limited access, no clinical docs</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    <button class="btn btn-primary btn-lg" onclick="seedAccounts()">
+                        <i class="bi bi-database-add"></i> Seed Demo Accounts
+                    </button>
+                    <a href="/login" class="btn btn-outline-secondary btn-lg">Go to Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function seedAccounts() {
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Seeding...';
+        
+        try {
+            const response = await fetch('/api/auth/seed-synthetic', {method: 'POST'});
+            const result = await response.json();
+            btn.innerHTML = '<i class="bi bi-check-circle"></i> Done! Accounts created.';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-success');
+        } catch (err) {
+            btn.innerHTML = '<i class="bi bi-x-circle"></i> Failed';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-danger');
+        }
+    }
+</script>
+{% endblock %}

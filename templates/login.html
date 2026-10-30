@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="bi bi-box-arrow-in-right"></i> Sign In</h4>
+            </div>
+            <div class="card-body">
+                <form id="login-form">
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-control" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-control" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Sign In</button>
+                </form>
+                <div class="mt-3 text-center">
+                    <a href="/register" class="text-decoration-none">Create Account</a>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <small class="text-muted">Demo Accounts:</small>
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-outline-secondary me-1 mb-1" onclick="fillDemo('patient')">Patient</button>
+                        <button class="btn btn-sm btn-outline-secondary me-1 mb-1" onclick="fillDemo('doctor')">Doctor</button>
+                        <button class="btn btn-sm btn-outline-secondary me-1 mb-1" onclick="fillDemo('staff')">Staff</button>
+                        <button class="btn btn-sm btn-outline-secondary mb-1" onclick="fillDemo('admin')">Admin</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const demoAccounts = {
+        patient: {email: 'patient@carepilot.demo', password: 'patient123'},
+        doctor: {email: 'doctor@carepilot.demo', password: 'doctor123'},
+        staff: {email: 'staff@carepilot.demo', password: 'staff123'},
+        admin: {email: 'admin@carepilot.demo', password: 'admin123'},
+    };
+    
+    function fillDemo(role) {
+        const acc = demoAccounts[role];
+        document.querySelector('input[name="email"]').value = acc.email;
+        document.querySelector('input[name="password"]').value = acc.password;
+    }
+    
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData);
+        
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            
+            if (!response.ok) throw new Error('Login failed');
+            
+            const result = await response.json();
+            localStorage.setItem('access_token', result.access_token);
+            
+            const meResponse = await fetch('/api/auth/me', {
+                headers: {'Authorization': `Bearer ${result.access_token}`}
+            });
+            const user = await meResponse.json();
+            localStorage.setItem('user_email', user.email);
+            localStorage.setItem('user_role', user.role);
+            
+            window.location.href = '/dashboard';
+        } catch (err) {
+            alert('Login failed: ' + err.message);
+        }
+    });
+</script>
+{% endblock %}

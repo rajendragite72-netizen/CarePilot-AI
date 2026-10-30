@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="bi bi-heart-pulse text-primary"></i> CarePilot AI</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        {% if not token %}
+        <a href="/login" class="btn btn-primary me-2">Sign In</a>
+        <a href="/register" class="btn btn-outline-secondary">Create Account</a>
+        {% else %}
+        <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-shield-check"></i> Secure & Private</h5>
+                <p class="card-text">Your medical data never leaves your control. Role-based access ensures only authorized providers can view your records.</p>
+            </div>
+        </div>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-file-earmark-text"></i> Document Intelligence</h5>
+                <p class="card-text">Upload prescriptions and medical documents. AI extracts key information with page references for verification.</p>
+            </div>
+        </div>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-bell"></i> Smart Reminders</h5>
+                <p class="card-text">Create medication reminders from verified instructions. Explicit confirmation required before activation.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-chat-dots"></i> AI Health Assistant</h5>
+                <p class="card-text">Ask questions about your medical records. Answers are grounded only in your authorized documents.</p>
+            </div>
+        </div>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-clock-history"></i> Complete Timeline</h5>
+                <p class="card-text">Every document, fact, and action recorded with full audit trail. Source-linked for transparency.</p>
+            </div>
+        </div>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-people"></i> Care Team Access</h5>
+                <p class="card-text">Grant time-limited, scoped access to doctors and staff. Revocable at any time.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Demo Accounts (Synthetic Data)</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="bi bi-person text-success fs-1"></i>
+                        <h6 class="mt-2">Patient</h6>
+                        <small class="text-muted">patient@carepilot.demo / patient123</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="bi bi-person-badge text-primary fs-1"></i>
+                        <h6 class="mt-2">Doctor</h6>
+                        <small class="text-muted">doctor@carepilot.demo / doctor123</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="bi bi-person-lines-fill text-secondary fs-1"></i>
+                        <h6 class="mt-2">Staff</h6>
+                        <small class="text-muted">staff@carepilot.demo / staff123</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="bi bi-person-gear text-dark fs-1"></i>
+                        <h6 class="mt-2">Admin</h6>
+                        <small class="text-muted">admin@carepilot.demo / admin123</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

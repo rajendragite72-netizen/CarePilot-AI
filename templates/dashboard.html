@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-file-earmark-medical text-primary fs-1"></i>
+                <h3 id="doc-count" class="mt-2">0</h3>
+                <small class="text-muted">Documents</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-bell text-success fs-1"></i>
+                <h3 id="reminder-count" class="mt-2">0</h3>
+                <small class="text-muted">Active Reminders</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-chat-dots text-info fs-1"></i>
+                <h3 id="chat-count" class="mt-2">0</h3>
+                <small class="text-muted">Conversations</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-clock-history text-warning fs-1"></i>
+                <h3 id="timeline-count" class="mt-2">0</h3>
+                <small class="text-muted">Timeline Events</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Recent Documents</h5>
+                <a href="/documents" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body" id="recent-documents">
+                <div class="text-center text-muted py-4">Loading...</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Active Reminders</h5>
+                <a href="/reminders" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body" id="active-reminders">
+                <div class="text-center text-muted py-4">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Timeline</h5>
+            </div>
+            <div class="card-body" id="recent-timeline">
+                <div class="text-center text-muted py-4">Loading...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const token = localStorage.getItem('access_token');
+    if (!token) window.location.href = '/login';
+    
+    async function fetchAPI(endpoint) {
+        const response = await fetch(endpoint, {
+            headers: {'Authorization': `Bearer ${token}`}
+        });
+        if (!response.ok) throw new Error('Failed to fetch');
+        return response.json();
+    }
+    
+    async function loadDashboard() {
+        try {
+            const [docs, reminders, chats, timeline] = await Promise.all([
+                fetchAPI('/api/documents'),
+                fetchAPI('/api/reminders'),
+                fetchAPI('/api/chat/conversations'),
+                fetchAPI('/api/timeline/patient/' + JSON.parse(atob(token.split('.')[1])).sub)
+            ]);
+            
+            document.getElementById('doc-count').textContent = docs.length;
+            document.getElementById('reminder-count').textContent = reminders.filter(r => r.status === 'active').length;
+            document.getElementById('chat-count').textContent = chats.length;
+            document.getElementById('timeline-count').textContent = timeline.length;
+            
+            renderRecentDocuments(docs.slice(0, 5));
+            renderActiveReminders(reminders.filter(r => r.status === 'active').slice(0, 5));
+            renderTimeline(timeline.slice(0, 10));
+        } catch (err) {
+            console.error(err);
+        }
+    }
+    
+    function renderRecentDocuments(docs) {
+        const container = document.getElementById('recent-documents');
+        if (docs.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-4">No documents yet. <a href="/documents">Upload one</a></div>';
+            return;
+        }
+        container.innerHTML = docs.map(doc => `
+            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                    <strong>${doc.original_filename}</strong>
+                    <br><small class="text-muted">${doc.status} • ${new Date(doc.created_at).toLocaleDateString()}</small>
+                </div>
+                <span class="badge bg-${doc.status === 'completed' ? 'success' : doc.status === 'processing' ? 'warning' : 'secondary'}">${doc.status}</span>
+            </div>
+        `).join('');
+    }
+    
+    function renderActiveReminders(reminders) {
+        const container = document.getElementById('active-reminders');
+        if (reminders.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-4">No active reminders</div>';
+            return;
+        }
+        container.innerHTML = reminders.map(r => `
+            <div class="py-2 border-bottom">
+                <strong>${r.medication_name}</strong>
+                <br><small class="text-muted">${r.frequency || 'As directed'}</small>
+                ${r.dose ? `<br><small class="text-muted">${r.dose}</small>` : ''}
+            </div>
+        `).join('');
+    }
+    
+    function renderTimeline(events) {
+        const container = document.getElementById('recent-timeline');
+        if (events.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted py-4">No timeline events yet</div>';
+            return;
+        }
+        container.innerHTML = events.map(e => `
+            <div class="d-flex py-2 border-bottom">
+                <div class="text-muted me-3" style="min-width: 100px;">${new Date(e.event_date).toLocaleString()}</div>
+                <div>
+                    <strong>${e.title}</strong>
+                    <br><small class="text-muted">${e.description || ''}</small>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    loadDashboard();
+</script>
+{% endblock %}

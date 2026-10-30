@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Documents</h1>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+        <i class="bi bi-upload"></i> Upload Document
+    </button>
+</div>
+
+<div class="row" id="documents-list">
+    <div class="col-12 text-center py-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2">Loading documents...</p>
+    </div>
+</div>
+
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload Medical Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">Select PDF or Text File</label>
+                        <input type="file" class="form-control" name="file" accept=".pdf,.txt" required>
+                        <div class="form-text">Max size: 10MB. PDF or text files only.</div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Upload & Process</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="factModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Extracted Facts</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="factModalBody">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const token = localStorage.getItem('access_token');
+    if (!token) window.location.href = '/login';
+    
+    async function fetchAPI(endpoint, options = {}) {
+        const response = await fetch(endpoint, {
+            ...options,
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                ...(options.headers || {})
+            }
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({detail: 'Request failed'}));
+            throw new Error(err.detail || 'Request failed');
+        }
+        return response.json();
+    }
+    
+    async function loadDocuments() {
+        try {
+            const docs = await fetchAPI('/api/documents');
+            renderDocuments(docs);
+        } catch (err) {
+            document.getElementById('documents-list').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+        }
+    }
+    
+    function renderDocuments(docs) {
+        const container = document.getElementById('documents-list');
+        if (docs.length === 0) {
+            container.innerHTML = '<div class="col-12 text-center py-5"><p class="text-muted">No documents uploaded yet.</p></div>';
+            return;
+        }
+        container.innerHTML = docs.map(doc => `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title mb-0">${doc.original_filename}</h6>
+                            <span class="badge bg-${getStatusColor(doc.status)}">${doc.status}</span>
+                        </div>
+                        <p class="card-text text-muted small">
+                            ${doc.page_count || '?'} pages • ${formatBytes(doc.file_size)}
+                            <br>${new Date(doc.created_at).toLocaleString()}
+                        </p>
+                        ${doc.processing_error ? `<p class="text-danger small">${doc.processing_error}</p>` : ''}
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="btn-group w-100" role="group">
+                            <button class="btn btn-outline-primary btn-sm" onclick="viewFacts(${doc.id})">
+                                <i class="bi bi-eye"></i> Facts
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" onclick="viewDocument(${doc.id})">
+                                <i class="bi bi-file-text"></i> View
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function getStatusColor(status) {
+        const colors = {completed: 'success', processing: 'warning', failed: 'danger', uploaded: 'secondary'};
+        return colors[status] || 'secondary';
+    }
+    
+    function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    
+    async function viewFacts(docId) {
+        try {
+            const facts = await fetchAPI(`/api/documents/${docId}/facts`);
+            const modal = new bootstrap.Modal(document.getElementById('factModal'));
+            renderFacts(facts);
+            modal.show();
+        } catch (err) {
+            alert('Failed to load facts: ' + err.message);
+        }
+    }
+    
+    function renderFacts(facts) {
+        const container = document.getElementById('factModalBody');
+        if (facts.length === 0) {
+            container.innerHTML = '<p class="text-muted">No facts extracted yet.</p>';
+            return;
+        }
+        container.innerHTML = facts.map(fact => `
+            <div class="card fact-card ${fact.status === 'uncertain' ? 'uncertain' : fact.status === 'patient_confirmed' ? 'confirmed' : ''} mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="badge bg-secondary">${fact.fact_type}</span>
+                        <span class="badge bg-${getFactStatusColor(fact.status)}">${fact.status}</span>
+                    </div>
+                    <p class="mb-1"><strong>Value:</strong> ${fact.extracted_value}</p>
+                    <p class="mb-1 text-muted small"><strong>Source (Page ${fact.page_number || '?'}):</strong> ${fact.source_text.substring(0, 200)}...</p>
+                    ${fact.uncertainty_reason ? `<p class="text-warning small mb-1"><i class="bi bi-exclamation-triangle"></i> ${fact.uncertainty_reason}</p>` : ''}
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-success" onclick="confirmFact(${fact.id})" ${fact.status !== 'extracted_unreviewed' && fact.status !== 'uncertain' ? 'disabled' : ''}>
+                            <i class="bi bi-check"></i> Confirm
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="markUncertain(${fact.id})" ${fact.status === 'uncertain' ? 'disabled' : ''}>
+                            <i class="bi bi-question"></i> Uncertain
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function getFactStatusColor(status) {
+        const colors = {
+            extracted_unreviewed: 'secondary',
+            uncertain: 'warning',
+            patient_confirmed: 'success',
+            clinician_reviewed: 'primary',
+            superseded: 'danger'
+        };
+        return colors[status] || 'secondary';
+    }
+    
+    async function confirmFact(factId) {
+        try {
+            await fetchAPI(`/api/documents/facts/${factId}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: 'patient_confirmed'})
+            });
+            bootstrap.Modal.getInstance(document.getElementById('factModal')).hide();
+            loadDocuments();
+        } catch (err) {
+            alert('Failed to confirm: ' + err.message);
+        }
+    }
+    
+    async function markUncertain(factId) {
+        try {
+            await fetchAPI(`/api/documents/facts/${factId}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: 'uncertain'})
+            });
+            bootstrap.Modal.getInstance(document.getElementById('factModal')).hide();
+            loadDocuments();
+        } catch (err) {
+            alert('Failed to update: ' + err.message);
+        }
+    }
+    
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        
+        try {
+            const response = await fetch('/api/documents/upload', {
+                method: 'POST',
+                headers: {'Authorization': `Bearer ${token}`},
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Upload failed');
+            }
+            
+            bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+            document.getElementById('uploadForm').reset();
+            loadDocuments();
+        } catch (err) {
+            alert('Upload failed: ' + err.message);
+        }
+    });
+    
+    loadDocuments();
+</script>
+{% endblock %}

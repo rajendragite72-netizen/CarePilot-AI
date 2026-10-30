@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title or "CarePilot AI" }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success: #16a34a;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+        }
+        body { background-color: #f8fafc; }
+        .sidebar {
+            min-height: 100vh;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+        }
+        .nav-link { color: #475569; }
+        .nav-link:hover, .nav-link.active { color: var(--primary); background: #eff6ff; }
+        .card { border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .btn-primary { background: var(--primary); border-color: var(--primary); }
+        .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+        .fact-card { border-left: 4px solid var(--primary); }
+        .fact-card.uncertain { border-left-color: var(--warning); }
+        .fact-card.confirmed { border-left-color: var(--success); }
+        .source-badge { font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse" id="sidebar">
+                <div class="position-sticky pt-3">
+                    <div class="px-3 mb-3">
+                        <h4 class="text-primary"><i class="bi bi-heart-pulse"></i> CarePilot AI</h4>
+                        <small class="text-muted">Personal Healthcare Agent</small>
+                    </div>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/dashboard" id="nav-dashboard">
+                                <i class="bi bi-speedometer2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/documents" id="nav-documents">
+                                <i class="bi bi-file-earmark-medical"></i> Documents
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/reminders" id="nav-reminders">
+                                <i class="bi bi-bell"></i> Reminders
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/chat" id="nav-chat">
+                                <i class="bi bi-chat-dots"></i> AI Assistant
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/timeline" id="nav-timeline">
+                                <i class="bi bi-clock-history"></i> Timeline
+                            </a>
+                        </li>
+                    </ul>
+                    <hr>
+                    <div class="px-3">
+                        <div id="user-info" class="text-muted small"></div>
+                    </div>
+                </div>
+            </nav>
+            
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const token = localStorage.getItem('access_token');
+        const userRole = localStorage.getItem('user_role');
+        
+        function updateAuthUI() {
+            const userInfo = document.getElementById('user-info');
+            if (token) {
+                userInfo.innerHTML = `<div class="mb-2">Logged in as <strong>${localStorage.getItem('user_email')}</strong></div>
+                    <div class="mb-2"><span class="badge bg-${userRole === 'doctor' ? 'primary' : userRole === 'staff' ? 'secondary' : 'success'}">${userRole}</span></div>
+                    <button class="btn btn-sm btn-outline-danger w-100" onclick="logout()">Logout</button>`;
+                document.querySelectorAll('.nav-link').forEach(el => el.style.display = 'block');
+            } else {
+                userInfo.innerHTML = `<a href="/login" class="btn btn-primary w-100 mb-1">Login</a>
+                    <a href="/register" class="btn btn-outline-secondary w-100">Register</a>`;
+                document.querySelectorAll('.nav-link:not(#nav-dashboard)').forEach(el => el.style.display = 'none');
+            }
+        }
+        
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/';
+        }
+        
+        updateAuthUI();
+        
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-link').forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+            }
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
